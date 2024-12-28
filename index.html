@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Chat Interface</title>
+    <!-- Add Highlight.js for code syntax highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <!-- Add Marked for markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <button class="new-chat-btn">New Chat</button>
+            <div class="chat-list"></div>
+        </div>
+        <div class="main-content">
+            <button class="settings-btn">⚙️</button>
+            <div class="chat-container"></div>
+            <div class="input-container">
+                <textarea class="message-input" placeholder="Type your message here..."></textarea>
+            </div>
+        </div>
+
+        <div class="settings-modal">
+            <div class="settings-content">
+                <div class="settings-header">
+                    <h2>Settings</h2>
+                    <button class="settings-close">×</button>
+                </div>
+                <div class="settings-section">
+                    <h3>System Prompt</h3>
+                    <textarea class="system-prompt" placeholder="Enter system prompt here..."></textarea>
+                </div>
+                <div class="settings-section">
+                    <h3>Add Message Directly</h3>
+                    <div class="add-message-form">
+                        <select class="message-role">
+                            <option value="user">User</option>
+                            <option value="assistant">Assistant</option>
+                        </select>
+                        <textarea class="message-content" placeholder="Enter message content..."></textarea>
+                        <button class="add-message-btn">Add Message</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="api-key-modal">
+        <div class="modal-content">
+            <h2>Enter your Anthropic API Key</h2>
+            <input type="password" class="api-key-input" placeholder="sk-...">
+            <button class="save-api-key">Save</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
