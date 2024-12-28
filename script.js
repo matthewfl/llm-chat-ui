@@ -94,12 +94,12 @@ class ChatApp {
     loadChat(chatId) {
         this.currentChatId = chatId;
         localStorage.setItem('currentChatId', chatId);
-        
+
         const chat = this.chats[chatId] || this.archivedChats[chatId];
         if (!chat) return;
 
         this.elements.systemPrompt.value = chat.systemPrompt || '';
-        
+
         document.querySelectorAll('.chat-item').forEach(item => {
             item.classList.remove('active');
             if (item.dataset.chatId === chatId) {
@@ -136,7 +136,7 @@ class ChatApp {
 
         const role = this.elements.messageRole.value;
         const content = this.elements.messageContent.value.trim();
-        
+
         if (!content) return;
 
         chat.messages.push({
@@ -176,8 +176,8 @@ class ChatApp {
         });
 
         // Render active chats
-        const activeChatIds = this.chatOrder.length > 0 ? 
-            this.chatOrder : 
+        const activeChatIds = this.chatOrder.length > 0 ?
+            this.chatOrder :
             Object.keys(this.chats);
 
         activeChatIds.forEach(chatId => {
@@ -288,10 +288,10 @@ class ChatApp {
         chat.messages.forEach((msg, index) => {
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${msg.role}`;
-            
+
             const contentDiv = document.createElement('div');
             contentDiv.className = 'message-content';
-            
+
             // Configure marked options
             marked.setOptions({
                 highlight: function(code, lang) {
@@ -306,7 +306,7 @@ class ChatApp {
 
             // Convert markdown to HTML
             contentDiv.innerHTML = marked.parse(msg.content);
-            
+
             // Apply syntax highlighting to any code blocks
             contentDiv.querySelectorAll('pre code').forEach((block) => {
                 hljs.highlightElement(block);
@@ -405,7 +405,7 @@ class ChatApp {
         // Only allow sending messages in active chats
         const chat = this.chats[this.currentChatId];
         if (!chat) return;
-        
+
         // Add user message
         chat.messages.push({
             role: 'user',
@@ -415,6 +415,14 @@ class ChatApp {
         this.elements.messageInput.value = '';
         this.renderMessages();
 
+        // Add a temporary message for streaming
+        const tempMessage = {
+            role: 'assistant',
+            content: ''
+        };
+        chat.messages.push(tempMessage);
+        this.renderMessages();
+
         try {
             const response = await fetch('https://api.anthropic.com/v1/messages', {
                 method: 'POST',
@@ -422,14 +430,14 @@ class ChatApp {
                     'Content-Type': 'application/json',
                     'x-api-key': this.apiKey,
                     'anthropic-version': '2023-06-01',
-                    // 'anthropic-beta': 'messages-2024-02-15', // not required anymore
-                    'anthropic-dangerous-direct-browser-access': 'true', // required for CORS requests
+                    'anthropic-dangerous-direct-browser-access': 'true',
                 },
                 body: JSON.stringify({
                     model: 'claude-3-5-sonnet-20241022',
                     max_tokens: 4096,
                     system: chat.systemPrompt || undefined,
-                    messages: chat.messages
+                    messages: chat.messages.slice(0, -1), // Exclude temporary message
+                    stream: true
                 })
             });
 
@@ -437,12 +445,76 @@ class ChatApp {
                 throw new Error('API request failed');
             }
 
-            const data = await response.json();
-            
-            chat.messages.push({
-                role: 'assistant',
-                content: data.content[0].text
-            });
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                // Append new chunks to buffer and process complete lines
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+                for (const line of lines) {
+                    if (line.trim() === '') continue;
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+                            switch (data.type) {
+                                case 'message_start':
+                                    // Initialize with empty content
+                                    tempMessage.content = '';
+                                    break;
+
+                                case 'content_block_start':
+                                    // New content block starting
+                                    break;
+
+                                case 'content_block_delta':
+                                    // Append content from the delta
+                                    if (data.delta?.text) {
+                                        tempMessage.content += data.delta.text;
+                                        this.renderMessages();
+                                        // Scroll to bottom as content streams in
+                                        this.elements.chatContainer.scrollTop = this.elements.chatContainer.scrollHeight;
+                                    }
+                                    break;
+
+                                case 'content_block_stop':
+                                    // Content block finished
+                                    break;
+
+                                case 'message_delta':
+                                    // Handle any top-level message changes if needed
+                                    break;
+
+                                case 'message_stop':
+                                    // Final message received
+                                    return;
+                            }
+                        } catch (e) {
+                            console.error('Error parsing SSE data:', e);
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            // Final decoder flush
+            if (buffer) {
+                try {
+                    const data = JSON.parse(buffer.slice(6));
+                    if (data.type === 'message_delta' && data.delta?.text) {
+                        tempMessage.content += data.delta.text;
+                        this.renderMessages();
+                    }
+                } catch (e) {
+                    console.error('Error parsing final buffer:', e);
+                }
+            }
 
             if (chat.messages.length === 2) {
                 // Update chat title based on first message
@@ -451,13 +523,10 @@ class ChatApp {
             }
 
             this.saveChats();
-            this.renderMessages();
         } catch (error) {
             console.error('Error:', error);
-            chat.messages.push({
-                role: 'assistant',
-                content: 'Sorry, there was an error processing your request. Please check your API key and try again.'
-            });
+            // Update the temporary message with error
+            tempMessage.content = 'Sorry, there was an error processing your request. Please check your API key and try again.';
             this.renderMessages();
         }
     }
@@ -487,7 +556,7 @@ class ChatApp {
             this.archivedChats[chatId] = chat;
             delete this.chats[chatId];
             this.chatOrder = this.chatOrder.filter(id => id !== chatId);
-            
+
             if (this.currentChatId === chatId) {
                 const nextChatId = this.chatOrder[0] || Object.keys(this.chats)[0];
                 if (nextChatId) {
@@ -517,7 +586,7 @@ class ChatApp {
         if (confirm('Are you sure you want to delete this chat? This cannot be undone.')) {
             delete this.chats[chatId];
             this.chatOrder = this.chatOrder.filter(id => id !== chatId);
-            
+
             if (this.currentChatId === chatId) {
                 const nextChatId = this.chatOrder[0] || Object.keys(this.chats)[0];
                 if (nextChatId) {
