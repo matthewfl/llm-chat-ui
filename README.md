@@ -49,4 +49,8 @@ For context, an example using the open router api is:
 
 can you make the ui responsive, so that it can be used on a phone.  The width of the application should support going down to 200px width, and when on a small device, hide the different chats on the left using a hamburge menu option at the top left
 
+[[MANUAL: fix settings button visibility as claude failed after several minutes of trying]]
+
+Can you make the global settings button not be visible when the sidebar is closed on smaller screenes
+
 ```

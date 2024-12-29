@@ -270,6 +270,19 @@ body {
     z-index: 200;
 }
 
+@media (max-width: 768px) {
+    .global-settings-btn {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+    }
+    
+    .sidebar.active ~ .main-content .global-settings-btn {
+        opacity: 1;
+        pointer-events: auto;
+    }
+}
+
 .global-settings-btn:hover {
     opacity: 1;
 }
