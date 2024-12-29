@@ -11,8 +11,6 @@ This code was 97% written by the `claude-3-5-sonnet-20241022` model from Anthrop
 ```
 Make a single index.html file that includes Javascript and CSS inline that can be used to chat with the Claude LLM.  Support having multiple chats.  Use the javascript fetch API to directly interact with the anthropic http API.  Store the states of the chats using local storage.  Also include support for defining custom system promps and going back and editing and deleting past messages.
 
-No, please use the claude-3-5-sonnet-20241022 model
-
 It seems that the anthropic api is being used incorrectly. There should be a top level system parameter not a system input message
 
 Can you add an edit and delete button to the user messages and to the assistant messages
@@ -24,8 +22,6 @@ can you add a feature to delete, archive and reorder the chats
 Sometimes claude will respond to messages with markdown, what options are there to render this markdown into nice html? (This includes code formatting)
 
 Can we create a settings option menu and then put the system prompt in that menu instead of having it at the top of the chat. Also can we have an option in the settings menu to create a message from the agent or user directly (rather than prompting the api) so that a chat can be "imported" by copying and pasting each message.
-
-NOTE: I have refactored the code myself to move the javascript and css into seperate files as the program was starting to get long.
 
 There is an issue where the settings button is hidden after the first chat message is created
 
@@ -48,7 +44,8 @@ Can you add support for also using openrouter as an option for querying the LLM.
 The global settings dialog will require two different api key fields (one for anthropic directly that already exists, and the other for open router).
 Then there should be a ratio button in the per-chat dialog that allows for selecting between openrouter and anthropic.
 The default model for openrouter should be anthropic/claude-3.5-sonnet
-For context, an example using the open router api is...
+For context, an example using the open router api is:
+...
 
 can you make the ui responsive, so that it can be used on a phone.  The width of the application should support going down to 200px width, and when on a small device, hide the different chats on the left using a hamburge menu option at the top left
 

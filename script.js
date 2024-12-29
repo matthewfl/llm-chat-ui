@@ -782,8 +782,8 @@ class ChatApp {
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${this.openrouterApiKey}`,
-                        'HTTP-Referer': window.location.origin,
-                        'X-Title': 'Claude Chat Interface'
+                        'HTTP-Referer': 'https://matthewfl.github.io/llm-chat-ui/',
+                        'X-Title': 'LLM Chat UI by matthewfl'
                     },
                     body: JSON.stringify({
                         model: chat.agent || 'anthropic/claude-3.5-sonnet',
