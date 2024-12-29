@@ -1,31 +1,120 @@
 class ChatApp {
     constructor() {
-        this.chats = JSON.parse(localStorage.getItem('chats')) || {};
-        this.archivedChats = JSON.parse(localStorage.getItem('archivedChats')) || {};
-        this.chatOrder = JSON.parse(localStorage.getItem('chatOrder')) || [];
-        this.currentChatId = localStorage.getItem('currentChatId');
-        this.apiKey = localStorage.getItem('anthropicApiKey');
+        this.chats = {};
+        this.archivedChats = {};
+        this.chatOrder = [];
+        this.currentChatId = null;
+        this.apiKey = null;
         this.showArchived = false;
+        this.db = null;
 
-        this.initializeElements();
-        this.attachEventListeners();
-        this.checkApiKey();
-
-        // Create a default chat if no chats exist
-        if (Object.keys(this.chats).length === 0) {
-            this.createNewChat();
-        } else {
-            this.renderChatList();
-            if (this.currentChatId && this.chats[this.currentChatId]) {
-                this.loadChat(this.currentChatId);
-            } else {
-                // Load the most recent chat if current chat is invalid
-                const mostRecentChatId = this.chatOrder[0] || Object.keys(this.chats)[0];
-                if (mostRecentChatId) {
-                    this.loadChat(mostRecentChatId);
+        this.initializeDB().then(() => {
+            this.initializeElements();
+            this.attachEventListeners();
+            this.loadInitialData().then(() => {
+                this.checkApiKey();
+                // Create a default chat if no chats exist
+                if (Object.keys(this.chats).length === 0) {
+                    this.createNewChat();
+                } else {
+                    this.renderChatList();
+                    if (this.currentChatId && this.chats[this.currentChatId]) {
+                        this.loadChat(this.currentChatId);
+                    } else {
+                        // Load the most recent chat if current chat is invalid
+                        const mostRecentChatId = this.chatOrder[0] || Object.keys(this.chats)[0];
+                        if (mostRecentChatId) {
+                            this.loadChat(mostRecentChatId);
+                        }
+                    }
                 }
-            }
-        }
+            });
+        });
+    }
+
+    async initializeDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open('ChatAppDB', 1);
+
+            request.onerror = () => reject(request.error);
+
+            request.onsuccess = () => {
+                this.db = request.result;
+                resolve();
+            };
+
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                
+                // Create object stores if they don't exist
+                if (!db.objectStoreNames.contains('chats')) {
+                    db.createObjectStore('chats', { keyPath: 'id' });
+                }
+                if (!db.objectStoreNames.contains('archivedChats')) {
+                    db.createObjectStore('archivedChats', { keyPath: 'id' });
+                }
+                if (!db.objectStoreNames.contains('settings')) {
+                    db.createObjectStore('settings', { keyPath: 'key' });
+                }
+            };
+        });
+    }
+
+    async loadInitialData() {
+        // Load chats
+        const chatsData = await this.getAllFromStore('chats');
+        chatsData.forEach(chat => {
+            this.chats[chat.id] = chat;
+        });
+
+        // Load archived chats
+        const archivedData = await this.getAllFromStore('archivedChats');
+        archivedData.forEach(chat => {
+            this.archivedChats[chat.id] = chat;
+        });
+
+        // Load settings
+        const settings = await this.getAllFromStore('settings');
+        const chatOrder = settings.find(s => s.key === 'chatOrder');
+        const currentChatId = settings.find(s => s.key === 'currentChatId');
+        const apiKey = settings.find(s => s.key === 'anthropicApiKey');
+
+        this.chatOrder = chatOrder ? chatOrder.value : [];
+        this.currentChatId = currentChatId ? currentChatId.value : null;
+        this.apiKey = apiKey ? apiKey.value : null;
+    }
+
+    async getAllFromStore(storeName) {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(storeName, 'readonly');
+            const store = transaction.objectStore(storeName);
+            const request = store.getAll();
+
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async putInStore(storeName, data) {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(storeName, 'readwrite');
+            const store = transaction.objectStore(storeName);
+            const request = store.put(data);
+
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async deleteFromStore(storeName, key) {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(storeName, 'readwrite');
+            const store = transaction.objectStore(storeName);
+            const request = store.delete(key);
+
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
     }
 
     initializeElements() {
@@ -67,7 +156,6 @@ class ChatApp {
     }
 
     openGlobalSettings() {
-        // Prepopulate with saved API key if it exists
         if (this.apiKey) {
             this.elements.apiKeyInput.value = this.apiKey;
         }
@@ -93,32 +181,39 @@ class ChatApp {
         }
     }
 
-    saveApiKey() {
+    async saveApiKey() {
         const apiKey = this.elements.apiKeyInput.value.trim();
         if (apiKey) {
             this.apiKey = apiKey;
-            localStorage.setItem('anthropicApiKey', apiKey);
+            await this.putInStore('settings', { key: 'anthropicApiKey', value: apiKey });
             this.elements.apiKeyModal.style.display = 'none';
         }
     }
 
-    createNewChat() {
+    async createNewChat() {
         const chatId = Date.now().toString();
-        this.chats[chatId] = {
+        const newChat = {
             id: chatId,
             title: 'New Chat',
             messages: [],
             systemPrompt: ''
         };
+        
+        this.chats[chatId] = newChat;
         this.chatOrder.unshift(chatId);
-        this.saveChats();
+        
+        await Promise.all([
+            this.putInStore('chats', newChat),
+            this.putInStore('settings', { key: 'chatOrder', value: this.chatOrder })
+        ]);
+        
         this.renderChatList();
         this.loadChat(chatId);
     }
 
-    loadChat(chatId) {
+    async loadChat(chatId) {
         this.currentChatId = chatId;
-        localStorage.setItem('currentChatId', chatId);
+        await this.putInStore('settings', { key: 'currentChatId', value: chatId });
 
         const chat = this.chats[chatId] || this.archivedChats[chatId];
         if (!chat) return;
@@ -135,14 +230,19 @@ class ChatApp {
         this.renderMessages();
     }
 
-    updateSystemPrompt() {
+    async updateSystemPrompt() {
         if (!this.currentChatId) return;
 
         const chat = this.chats[this.currentChatId] || this.archivedChats[this.currentChatId];
         if (!chat) return;
 
         chat.systemPrompt = this.elements.systemPrompt.value;
-        this.saveChats();
+        
+        if (this.chats[this.currentChatId]) {
+            await this.putInStore('chats', chat);
+        } else {
+            await this.putInStore('archivedChats', chat);
+        }
     }
 
     openSettings() {
@@ -153,7 +253,7 @@ class ChatApp {
         this.elements.settingsModal.style.display = 'none';
     }
 
-    addMessageDirectly() {
+    async addMessageDirectly() {
         if (!this.currentChatId) return;
 
         const chat = this.chats[this.currentChatId] || this.archivedChats[this.currentChatId];
@@ -175,7 +275,13 @@ class ChatApp {
         }
 
         this.elements.messageContent.value = '';
-        this.saveChats();
+        
+        if (this.chats[this.currentChatId]) {
+            await this.putInStore('chats', chat);
+        } else {
+            await this.putInStore('archivedChats', chat);
+        }
+        
         this.renderMessages();
         this.closeSettings();
     }
@@ -235,7 +341,7 @@ class ChatApp {
                 div.classList.remove('dragging');
             });
 
-            div.addEventListener('dragover', (e) => {
+            div.addEventListener('dragover', async (e) => {
                 e.preventDefault();
                 const draggingItem = this.elements.chatList.querySelector('.dragging');
                 if (draggingItem && draggingItem !== div) {
@@ -250,7 +356,7 @@ class ChatApp {
                     this.chatOrder = Array.from(this.elements.chatList.querySelectorAll('.chat-item'))
                         .map(item => item.dataset.chatId)
                         .filter(id => id);
-                    this.saveChatOrder();
+                    await this.putInStore('settings', { key: 'chatOrder', value: this.chatOrder });
                 }
             });
 
@@ -400,11 +506,15 @@ class ChatApp {
                 textarea.focus();
 
                 // Handle save
-                saveBtn.addEventListener('click', () => {
+                saveBtn.addEventListener('click', async () => {
                     const newContent = textarea.value.trim();
                     if (newContent) {
                         msg.content = newContent;
-                        this.saveChats();
+                        if (this.chats[this.currentChatId]) {
+                            await this.putInStore('chats', chat);
+                        } else {
+                            await this.putInStore('archivedChats', chat);
+                        }
                         this.renderMessages();
                     }
                 });
@@ -518,7 +628,8 @@ class ChatApp {
 
                                 case 'message_stop':
                                     // Final message received
-                                    return;
+                                    await this.putInStore('chats', chat);
+                                    break;
                             }
                         } catch (e) {
                             console.error('Error parsing SSE data:', e);
@@ -547,7 +658,11 @@ class ChatApp {
                 this.renderChatList();
             }
 
-            this.saveChats();
+            // Ensure final state is saved
+            await Promise.all([
+                this.putInStore('chats', chat),
+                this.putInStore('settings', { key: 'chatOrder', value: this.chatOrder })
+            ]);
         } catch (error) {
             console.error('Error:', error);
             // Update the temporary message with error
@@ -556,32 +671,28 @@ class ChatApp {
         }
     }
 
-    deleteMessage(index) {
+    async deleteMessage(index) {
         if (confirm('Are you sure you want to delete this message?')) {
             const chat = this.chats[this.currentChatId];
             chat.messages.splice(index, 1);
-            this.saveChats();
+            await this.putInStore('chats', chat);
             this.renderMessages();
         }
     }
 
-    saveChats() {
-        localStorage.setItem('chats', JSON.stringify(this.chats));
-        localStorage.setItem('archivedChats', JSON.stringify(this.archivedChats));
-        this.saveChatOrder();
-    }
-
-    saveChatOrder() {
-        localStorage.setItem('chatOrder', JSON.stringify(this.chatOrder));
-    }
-
-    archiveChat(chatId) {
+    async archiveChat(chatId) {
         if (confirm('Are you sure you want to archive this chat?')) {
             const chat = this.chats[chatId];
             this.archivedChats[chatId] = chat;
             delete this.chats[chatId];
             this.chatOrder = this.chatOrder.filter(id => id !== chatId);
 
+            await Promise.all([
+                this.putInStore('archivedChats', chat),
+                this.deleteFromStore('chats', chatId),
+                this.putInStore('settings', { key: 'chatOrder', value: this.chatOrder })
+            ]);
+
             if (this.currentChatId === chatId) {
                 const nextChatId = this.chatOrder[0] || Object.keys(this.chats)[0];
                 if (nextChatId) {
@@ -591,26 +702,35 @@ class ChatApp {
                 }
             }
 
-            this.saveChats();
             this.renderChatList();
         }
     }
 
-    unarchiveChat(chatId) {
+    async unarchiveChat(chatId) {
         const chat = this.archivedChats[chatId];
         this.chats[chatId] = chat;
         delete this.archivedChats[chatId];
         this.chatOrder.unshift(chatId);
 
+        await Promise.all([
+            this.putInStore('chats', chat),
+            this.deleteFromStore('archivedChats', chatId),
+            this.putInStore('settings', { key: 'chatOrder', value: this.chatOrder })
+        ]);
+
         this.loadChat(chatId);
-        this.saveChats();
         this.renderChatList();
     }
 
-    deleteChat(chatId) {
+    async deleteChat(chatId) {
         if (confirm('Are you sure you want to delete this chat? This cannot be undone.')) {
             delete this.chats[chatId];
             this.chatOrder = this.chatOrder.filter(id => id !== chatId);
+
+            await Promise.all([
+                this.deleteFromStore('chats', chatId),
+                this.putInStore('settings', { key: 'chatOrder', value: this.chatOrder })
+            ]);
 
             if (this.currentChatId === chatId) {
                 const nextChatId = this.chatOrder[0] || Object.keys(this.chats)[0];
@@ -621,20 +741,19 @@ class ChatApp {
                 }
             }
 
-            this.saveChats();
             this.renderChatList();
         }
     }
 
-    deleteArchivedChat(chatId) {
+    async deleteArchivedChat(chatId) {
         if (confirm('Are you sure you want to delete this archived chat? This cannot be undone.')) {
             delete this.archivedChats[chatId];
-            this.saveChats();
+            await this.deleteFromStore('archivedChats', chatId);
             this.renderChatList();
         }
     }
 
-    loadArchivedChat(chatId) {
+    async loadArchivedChat(chatId) {
         const chat = this.archivedChats[chatId];
         if (!chat) return;
 
