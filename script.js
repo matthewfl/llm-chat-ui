@@ -8,6 +8,7 @@ class ChatApp {
         this.openrouterApiKey = null;
         this.showArchived = false;
         this.db = null;
+        this.sidebarVisible = true;
 
         this.initializeDB().then(() => {
             this.initializeElements();
@@ -139,6 +140,8 @@ class ChatApp {
 
     initializeElements() {
         this.elements = {
+            hamburgerMenu: document.querySelector('.hamburger-menu'),
+            sidebar: document.querySelector('.sidebar'),
             newChatBtn: document.querySelector('.new-chat-btn'),
             chatList: document.querySelector('.chat-list'),
             systemPrompt: document.querySelector('.system-prompt'),
@@ -162,6 +165,25 @@ class ChatApp {
     }
 
     attachEventListeners() {
+        // Add hamburger menu event listener
+        this.elements.hamburgerMenu.addEventListener('click', () => this.toggleSidebar());
+        
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', (e) => {
+            if (window.innerWidth <= 768 && this.sidebarVisible) {
+                if (!this.elements.sidebar.contains(e.target) && 
+                    !this.elements.hamburgerMenu.contains(e.target)) {
+                    this.toggleSidebar();
+                }
+            }
+        });
+
+        // Initialize sidebar state for mobile
+        if (window.innerWidth <= 768) {
+            this.sidebarVisible = false;
+            this.elements.sidebar.classList.remove('active');
+        }
+
         this.elements.newChatBtn.addEventListener('click', () => this.createNewChat());
         this.elements.messageInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -413,6 +435,15 @@ class ChatApp {
 
     closeSettings() {
         this.elements.settingsModal.style.display = 'none';
+    }
+
+    toggleSidebar() {
+        this.sidebarVisible = !this.sidebarVisible;
+        if (this.sidebarVisible) {
+            this.elements.sidebar.classList.add('active');
+        } else {
+            this.elements.sidebar.classList.remove('active');
+        }
     }
 
     async addMessageDirectly() {
