@@ -2,7 +2,7 @@
 
 This is a static HTML webpage that can be used to chat with LLMs using the [Anthropic API](https://docs.anthropic.com/en/api/messages) or the [OpenRouter API](https://openrouter.ai/docs/requests) using CORS requets.  State is saved locally in the browser using IndexedDB.
 
-This code was 97% written by the `claude-3-5-sonnet-20241022` model from Anthropic, using the [cline](https://github.com/cline/cline) plugin for VSCode
+This code was 97% written by the `claude-3-5-sonnet-20241022` model from Anthropic, using the [cline](https://github.com/cline/cline) plugin for VSCode.
 
 
 ### LLM messages to build this app
