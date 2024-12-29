@@ -22,7 +22,8 @@ The instructions to generate this file is in llm_instructions.txt
             <div class="chat-list"></div>
         </div>
         <div class="main-content">
-            <button class="settings-btn">⚙️</button>
+            <button class="settings-btn" title="Chat Settings">⚙️</button>
+            <button class="global-settings-btn" title="Global Settings">⚙️</button>
             <div class="chat-container"></div>
             <div class="input-container">
                 <textarea class="message-input" placeholder="Type your message here..."></textarea>
@@ -56,7 +57,10 @@ The instructions to generate this file is in llm_instructions.txt
 
     <div class="api-key-modal">
         <div class="modal-content">
-            <h2>Enter your Anthropic API Key</h2>
+            <div class="modal-header">
+                <h2>Enter your Anthropic API Key</h2>
+                <button class="modal-close">×</button>
+            </div>
             <input type="password" class="api-key-input" placeholder="sk-...">
             <button class="save-api-key">Save</button>
         </div>

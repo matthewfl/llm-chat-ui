@@ -38,7 +38,9 @@ class ChatApp {
             apiKeyModal: document.querySelector('.api-key-modal'),
             apiKeyInput: document.querySelector('.api-key-input'),
             saveApiKeyBtn: document.querySelector('.save-api-key'),
+            apiKeyModalClose: document.querySelector('.modal-close'),
             settingsBtn: document.querySelector('.settings-btn'),
+            globalSettingsBtn: document.querySelector('.global-settings-btn'),
             settingsModal: document.querySelector('.settings-modal'),
             settingsClose: document.querySelector('.settings-close'),
             messageRole: document.querySelector('.message-role'),
@@ -57,9 +59,32 @@ class ChatApp {
         });
         this.elements.systemPrompt.addEventListener('input', () => this.updateSystemPrompt());
         this.elements.saveApiKeyBtn.addEventListener('click', () => this.saveApiKey());
+        this.elements.apiKeyModalClose.addEventListener('click', () => this.closeGlobalSettings());
         this.elements.settingsBtn.addEventListener('click', () => this.openSettings());
+        this.elements.globalSettingsBtn.addEventListener('click', () => this.openGlobalSettings());
         this.elements.settingsClose.addEventListener('click', () => this.closeSettings());
         this.elements.addMessageBtn.addEventListener('click', () => this.addMessageDirectly());
+    }
+
+    openGlobalSettings() {
+        // Prepopulate with saved API key if it exists
+        if (this.apiKey) {
+            this.elements.apiKeyInput.value = this.apiKey;
+        }
+        this.elements.apiKeyModal.style.display = 'flex';
+    }
+
+    closeGlobalSettings() {
+        const currentInputValue = this.elements.apiKeyInput.value.trim();
+        if (!currentInputValue) {
+            alert('Please enter an API key before closing the settings.');
+            return;
+        }
+        if (currentInputValue !== this.apiKey) {
+            alert('Please save your API key changes before closing.');
+            return;
+        }
+        this.elements.apiKeyModal.style.display = 'none';
     }
 
     checkApiKey() {

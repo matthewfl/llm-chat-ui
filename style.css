@@ -162,6 +162,24 @@ body {
     opacity: 1;
 }
 
+.global-settings-btn {
+    background: none;
+    border: none;
+    color: var(--text-color);
+    cursor: pointer;
+    padding: 0.5rem;
+    opacity: 0.7;
+    position: fixed;
+    bottom: 1rem;
+    left: 1rem;
+    font-size: 1.2rem;
+    z-index: 10;
+}
+
+.global-settings-btn:hover {
+    opacity: 1;
+}
+
 .settings-modal {
     display: none;
     position: fixed;
@@ -488,6 +506,30 @@ body {
     border-radius: 8px;
     width: 90%;
     max-width: 500px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.modal-header h2 {
+    margin: 0;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    opacity: 0.7;
+    color: var(--text-color);
+}
+
+.modal-close:hover {
+    opacity: 1;
 }
 
 .api-key-input {
