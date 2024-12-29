@@ -224,7 +224,7 @@ class ChatApp {
 
         // Set default model based on provider
         if (newProvider === 'openrouter') {
-            chat.agent = 'anthropic/claude-3-sonnet';
+            chat.agent = 'anthropic/claude-3.5-sonnet';
             this.elements.agentInput.value = chat.agent;
         } else {
             chat.agent = 'claude-3-5-sonnet-20241022';
@@ -659,7 +659,7 @@ class ChatApp {
                         'X-Title': 'Claude Chat Interface'
                     },
                     body: JSON.stringify({
-                        model: chat.agent || 'anthropic/claude-3-sonnet',
+                        model: chat.agent || 'anthropic/claude-3.5-sonnet',
                         messages: [
                             ...(chat.systemPrompt ? [{ role: 'system', content: chat.systemPrompt }] : []),
                             ...chat.messages.slice(0, -1) // Exclude temporary message
@@ -691,38 +691,53 @@ class ChatApp {
                     if (line.startsWith('data: ')) {
                         try {
                             const data = JSON.parse(line.slice(6));
-                            switch (data.type) {
-                                case 'message_start':
-                                    // Initialize with empty content
-                                    tempMessage.content = '';
-                                    break;
+                            if (chat.provider === 'anthropic') {
+                                switch (data.type) {
+                                    case 'message_start':
+                                        // Initialize with empty content
+                                        tempMessage.content = '';
+                                        break;
 
-                                case 'content_block_start':
-                                    // New content block starting
-                                    break;
+                                    case 'content_block_start':
+                                        // New content block starting
+                                        break;
 
-                                case 'content_block_delta':
-                                    // Append content from the delta
-                                    if (data.delta?.text) {
-                                        tempMessage.content += data.delta.text;
-                                        this.renderMessages();
-                                        // Scroll to bottom as content streams in
-                                        this.elements.chatContainer.scrollTop = this.elements.chatContainer.scrollHeight;
-                                    }
-                                    break;
+                                    case 'content_block_delta':
+                                        // Append content from the delta
+                                        if (data.delta?.text) {
+                                            tempMessage.content += data.delta.text;
+                                            this.renderMessages();
+                                            // Scroll to bottom as content streams in
+                                            this.elements.chatContainer.scrollTop = this.elements.chatContainer.scrollHeight;
+                                        }
+                                        break;
 
-                                case 'content_block_stop':
-                                    // Content block finished
-                                    break;
+                                    case 'content_block_stop':
+                                        // Content block finished
+                                        break;
 
-                                case 'message_delta':
-                                    // Handle any top-level message changes if needed
-                                    break;
+                                    case 'message_delta':
+                                        // Handle any top-level message changes if needed
+                                        break;
 
-                                case 'message_stop':
-                                    // Final message received
+                                    case 'message_stop':
+                                        // Final message received
+                                        await this.putInStore('chats', chat);
+                                        break;
+                                }
+                            } else {
+                                // OpenRouter format
+                                if (data.choices && data.choices[0]?.delta?.content !== undefined) {
+                                    const content = data.choices[0].delta.content;
+                                    tempMessage.content += content;
+                                    this.renderMessages();
+                                    // Scroll to bottom as content streams in
+                                    this.elements.chatContainer.scrollTop = this.elements.chatContainer.scrollHeight;
+                                }
+                                // Save when we get the final message with finish_reason
+                                if (data.choices && data.choices[0]?.finish_reason === 'stop') {
                                     await this.putInStore('chats', chat);
-                                    break;
+                                }
                             }
                         } catch (e) {
                             console.error('Error parsing SSE data:', e);
