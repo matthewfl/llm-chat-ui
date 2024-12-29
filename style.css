@@ -233,6 +233,15 @@ body {
     color: var(--text-color);
 }
 
+.agent-input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-family: inherit;
+    margin-bottom: 1rem;
+}
+
 .system-prompt {
     width: 100%;
     padding: 0.5rem;

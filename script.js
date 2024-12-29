@@ -122,6 +122,7 @@ class ChatApp {
             newChatBtn: document.querySelector('.new-chat-btn'),
             chatList: document.querySelector('.chat-list'),
             systemPrompt: document.querySelector('.system-prompt'),
+            agentInput: document.querySelector('.agent-input'),
             chatContainer: document.querySelector('.chat-container'),
             messageInput: document.querySelector('.message-input'),
             apiKeyModal: document.querySelector('.api-key-modal'),
@@ -147,6 +148,7 @@ class ChatApp {
             }
         });
         this.elements.systemPrompt.addEventListener('input', () => this.updateSystemPrompt());
+        this.elements.agentInput.addEventListener('input', () => this.updateAgent());
         this.elements.saveApiKeyBtn.addEventListener('click', () => this.saveApiKey());
         this.elements.apiKeyModalClose.addEventListener('click', () => this.closeGlobalSettings());
         this.elements.settingsBtn.addEventListener('click', () => this.openSettings());
@@ -196,7 +198,8 @@ class ChatApp {
             id: chatId,
             title: 'New Chat',
             messages: [],
-            systemPrompt: ''
+            systemPrompt: '',
+            agent: 'claude-3-5-sonnet-20241022'
         };
         
         this.chats[chatId] = newChat;
@@ -219,6 +222,7 @@ class ChatApp {
         if (!chat) return;
 
         this.elements.systemPrompt.value = chat.systemPrompt || '';
+        this.elements.agentInput.value = chat.agent || 'claude-3-5-sonnet-20241022';
 
         document.querySelectorAll('.chat-item').forEach(item => {
             item.classList.remove('active');
@@ -228,6 +232,21 @@ class ChatApp {
         });
 
         this.renderMessages();
+    }
+
+    async updateAgent() {
+        if (!this.currentChatId) return;
+
+        const chat = this.chats[this.currentChatId] || this.archivedChats[this.currentChatId];
+        if (!chat) return;
+
+        chat.agent = this.elements.agentInput.value;
+        
+        if (this.chats[this.currentChatId]) {
+            await this.putInStore('chats', chat);
+        } else {
+            await this.putInStore('archivedChats', chat);
+        }
     }
 
     async updateSystemPrompt() {
@@ -568,7 +587,7 @@ class ChatApp {
                     'anthropic-dangerous-direct-browser-access': 'true',
                 },
                 body: JSON.stringify({
-                    model: 'claude-3-5-sonnet-20241022',
+                    model: chat.agent || 'claude-3-5-sonnet-20241022',
                     max_tokens: 4096,
                     system: chat.systemPrompt || undefined,
                     messages: chat.messages.slice(0, -1), // Exclude temporary message
