@@ -37,8 +37,15 @@ The instructions to generate this file is in llm_instructions.txt
                     <button class="settings-close">×</button>
                 </div>
                 <div class="settings-section">
-                    <h3>Agent</h3>
-                    <input type="text" class="agent-input" placeholder="Enter agent name..." value="claude-3-5-sonnet-20241022">
+                    <h3>Provider</h3>
+                    <select class="provider-select">
+                        <option value="anthropic">Anthropic (Direct)</option>
+                        <option value="openrouter">OpenRouter</option>
+                    </select>
+                </div>
+                <div class="settings-section">
+                    <h3>Model</h3>
+                    <input type="text" class="agent-input" placeholder="Enter model name..." value="claude-3-5-sonnet-20241022">
                 </div>
                 <div class="settings-section">
                     <h3>System Prompt</h3>
@@ -62,10 +69,17 @@ The instructions to generate this file is in llm_instructions.txt
     <div class="api-key-modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Enter your Anthropic API Key</h2>
+                <h2>API Settings</h2>
                 <button class="modal-close">×</button>
             </div>
-            <input type="password" class="api-key-input" placeholder="sk-...">
+            <div class="settings-field">
+                <label for="anthropicApiKey">Anthropic API Key:</label>
+                <input type="password" id="anthropicApiKey" placeholder="sk-..." />
+            </div>
+            <div class="settings-field">
+                <label for="openrouterApiKey">OpenRouter API Key:</label>
+                <input type="password" id="openrouterApiKey" placeholder="sk-..." />
+            </div>
             <button class="save-api-key">Save</button>
         </div>
     </div>

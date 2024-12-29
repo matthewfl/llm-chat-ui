@@ -4,7 +4,8 @@ class ChatApp {
         this.archivedChats = {};
         this.chatOrder = [];
         this.currentChatId = null;
-        this.apiKey = null;
+        this.anthropicApiKey = null;
+        this.openrouterApiKey = null;
         this.showArchived = false;
         this.db = null;
 
@@ -77,11 +78,13 @@ class ChatApp {
         const settings = await this.getAllFromStore('settings');
         const chatOrder = settings.find(s => s.key === 'chatOrder');
         const currentChatId = settings.find(s => s.key === 'currentChatId');
-        const apiKey = settings.find(s => s.key === 'anthropicApiKey');
+        const anthropicApiKey = settings.find(s => s.key === 'anthropicApiKey');
+        const openrouterApiKey = settings.find(s => s.key === 'openrouterApiKey');
 
         this.chatOrder = chatOrder ? chatOrder.value : [];
         this.currentChatId = currentChatId ? currentChatId.value : null;
-        this.apiKey = apiKey ? apiKey.value : null;
+        this.anthropicApiKey = anthropicApiKey ? anthropicApiKey.value : null;
+        this.openrouterApiKey = openrouterApiKey ? openrouterApiKey.value : null;
     }
 
     async getAllFromStore(storeName) {
@@ -126,7 +129,9 @@ class ChatApp {
             chatContainer: document.querySelector('.chat-container'),
             messageInput: document.querySelector('.message-input'),
             apiKeyModal: document.querySelector('.api-key-modal'),
-            apiKeyInput: document.querySelector('.api-key-input'),
+            anthropicApiKey: document.querySelector('#anthropicApiKey'),
+            openrouterApiKey: document.querySelector('#openrouterApiKey'),
+            providerSelect: document.querySelector('.provider-select'),
             saveApiKeyBtn: document.querySelector('.save-api-key'),
             apiKeyModalClose: document.querySelector('.modal-close'),
             settingsBtn: document.querySelector('.settings-btn'),
@@ -155,40 +160,81 @@ class ChatApp {
         this.elements.globalSettingsBtn.addEventListener('click', () => this.openGlobalSettings());
         this.elements.settingsClose.addEventListener('click', () => this.closeSettings());
         this.elements.addMessageBtn.addEventListener('click', () => this.addMessageDirectly());
+        this.elements.providerSelect.addEventListener('change', () => this.updateProvider());
     }
 
     openGlobalSettings() {
-        if (this.apiKey) {
-            this.elements.apiKeyInput.value = this.apiKey;
+        if (this.anthropicApiKey) {
+            this.elements.anthropicApiKey.value = this.anthropicApiKey;
+        }
+        if (this.openrouterApiKey) {
+            this.elements.openrouterApiKey.value = this.openrouterApiKey;
         }
         this.elements.apiKeyModal.style.display = 'flex';
     }
 
     closeGlobalSettings() {
-        const currentInputValue = this.elements.apiKeyInput.value.trim();
-        if (!currentInputValue) {
-            alert('Please enter an API key before closing the settings.');
+        const currentAnthropicKey = this.elements.anthropicApiKey.value.trim();
+        const currentOpenRouterKey = this.elements.openrouterApiKey.value.trim();
+        
+        if (!currentAnthropicKey && !currentOpenRouterKey) {
+            alert('Please enter at least one API key before closing the settings.');
             return;
         }
-        if (currentInputValue !== this.apiKey) {
+        
+        if (currentAnthropicKey !== this.anthropicApiKey || currentOpenRouterKey !== this.openrouterApiKey) {
             alert('Please save your API key changes before closing.');
             return;
         }
+        
         this.elements.apiKeyModal.style.display = 'none';
     }
 
     checkApiKey() {
-        if (!this.apiKey) {
+        if (!this.anthropicApiKey && !this.openrouterApiKey) {
             this.elements.apiKeyModal.style.display = 'flex';
         }
     }
 
     async saveApiKey() {
-        const apiKey = this.elements.apiKeyInput.value.trim();
-        if (apiKey) {
-            this.apiKey = apiKey;
-            await this.putInStore('settings', { key: 'anthropicApiKey', value: apiKey });
+        const anthropicKey = this.elements.anthropicApiKey.value.trim();
+        const openrouterKey = this.elements.openrouterApiKey.value.trim();
+        
+        if (anthropicKey || openrouterKey) {
+            if (anthropicKey) {
+                this.anthropicApiKey = anthropicKey;
+                await this.putInStore('settings', { key: 'anthropicApiKey', value: anthropicKey });
+            }
+            if (openrouterKey) {
+                this.openrouterApiKey = openrouterKey;
+                await this.putInStore('settings', { key: 'openrouterApiKey', value: openrouterKey });
+            }
             this.elements.apiKeyModal.style.display = 'none';
+        }
+    }
+
+    async updateProvider() {
+        if (!this.currentChatId) return;
+
+        const chat = this.chats[this.currentChatId] || this.archivedChats[this.currentChatId];
+        if (!chat) return;
+
+        const newProvider = this.elements.providerSelect.value;
+        chat.provider = newProvider;
+
+        // Set default model based on provider
+        if (newProvider === 'openrouter') {
+            chat.agent = 'anthropic/claude-3-sonnet';
+            this.elements.agentInput.value = chat.agent;
+        } else {
+            chat.agent = 'claude-3-5-sonnet-20241022';
+            this.elements.agentInput.value = chat.agent;
+        }
+        
+        if (this.chats[this.currentChatId]) {
+            await this.putInStore('chats', chat);
+        } else {
+            await this.putInStore('archivedChats', chat);
         }
     }
 
@@ -199,7 +245,8 @@ class ChatApp {
             title: 'New Chat',
             messages: [],
             systemPrompt: '',
-            agent: 'claude-3-5-sonnet-20241022'
+            agent: 'claude-3-5-sonnet-20241022',
+            provider: 'anthropic'
         };
         
         this.chats[chatId] = newChat;
@@ -578,22 +625,49 @@ class ChatApp {
         this.renderMessages();
 
         try {
-            const response = await fetch('https://api.anthropic.com/v1/messages', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-api-key': this.apiKey,
-                    'anthropic-version': '2023-06-01',
-                    'anthropic-dangerous-direct-browser-access': 'true',
-                },
-                body: JSON.stringify({
-                    model: chat.agent || 'claude-3-5-sonnet-20241022',
-                    max_tokens: 4096,
-                    system: chat.systemPrompt || undefined,
-                    messages: chat.messages.slice(0, -1), // Exclude temporary message
-                    stream: true
-                })
-            });
+            let response;
+            if (chat.provider === 'anthropic') {
+                if (!this.anthropicApiKey) {
+                    throw new Error('Anthropic API key not set');
+                }
+                response = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': this.anthropicApiKey,
+                        'anthropic-version': '2023-06-01',
+                        'anthropic-dangerous-direct-browser-access': 'true',
+                    },
+                    body: JSON.stringify({
+                        model: chat.agent || 'claude-3-5-sonnet-20241022',
+                        max_tokens: 4096,
+                        system: chat.systemPrompt || undefined,
+                        messages: chat.messages.slice(0, -1), // Exclude temporary message
+                        stream: true
+                    })
+                });
+            } else {
+                if (!this.openrouterApiKey) {
+                    throw new Error('OpenRouter API key not set');
+                }
+                response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${this.openrouterApiKey}`,
+                        'HTTP-Referer': window.location.origin,
+                        'X-Title': 'Claude Chat Interface'
+                    },
+                    body: JSON.stringify({
+                        model: chat.agent || 'anthropic/claude-3-sonnet',
+                        messages: [
+                            ...(chat.systemPrompt ? [{ role: 'system', content: chat.systemPrompt }] : []),
+                            ...chat.messages.slice(0, -1) // Exclude temporary message
+                        ],
+                        stream: true
+                    })
+                });
+            }
 
             if (!response.ok) {
                 throw new Error('API request failed');

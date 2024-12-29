@@ -233,6 +233,34 @@ body {
     color: var(--text-color);
 }
 
+.settings-field {
+    margin-bottom: 1rem;
+}
+
+.settings-field label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--text-color);
+}
+
+.settings-field input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.provider-select {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 1rem;
+    background: white;
+    margin-bottom: 1rem;
+}
+
 .agent-input {
     width: 100%;
     padding: 0.5rem;
@@ -541,14 +569,6 @@ body {
     opacity: 1;
 }
 
-.api-key-input {
-    width: 100%;
-    padding: 0.5rem;
-    margin: 1rem 0;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-}
-
 .save-api-key {
     background: var(--primary-color);
     color: white;
@@ -556,4 +576,6 @@ body {
     padding: 0.5rem 1rem;
     border-radius: 4px;
     cursor: pointer;
+    margin-top: 1rem;
+    width: 100%;
 }
