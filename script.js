@@ -120,6 +120,23 @@ class ChatApp {
         });
     }
 
+    getDefaultProvider() {
+        // If only OpenRouter key is available, use OpenRouter
+        if (!this.anthropicApiKey && this.openrouterApiKey) {
+            return 'openrouter';
+        }
+        // If only Anthropic key is available, use Anthropic
+        if (this.anthropicApiKey && !this.openrouterApiKey) {
+            return 'anthropic';
+        }
+        // If both are available, default to Anthropic
+        return 'anthropic';
+    }
+
+    getDefaultModel(provider) {
+        return provider === 'openrouter' ? 'anthropic/claude-3.5-sonnet' : 'claude-3-5-sonnet-20241022';
+    }
+
     initializeElements() {
         this.elements = {
             newChatBtn: document.querySelector('.new-chat-btn'),
@@ -201,14 +218,60 @@ class ChatApp {
         const openrouterKey = this.elements.openrouterApiKey.value.trim();
         
         if (anthropicKey || openrouterKey) {
+            const previousAnthropicKey = this.anthropicApiKey;
+            const previousOpenrouterKey = this.openrouterApiKey;
+
+            // Update Anthropic key
             if (anthropicKey) {
                 this.anthropicApiKey = anthropicKey;
                 await this.putInStore('settings', { key: 'anthropicApiKey', value: anthropicKey });
+            } else {
+                this.anthropicApiKey = null;
+                await this.deleteFromStore('settings', 'anthropicApiKey');
             }
+            
+            // Update OpenRouter key
             if (openrouterKey) {
                 this.openrouterApiKey = openrouterKey;
                 await this.putInStore('settings', { key: 'openrouterApiKey', value: openrouterKey });
+            } else {
+                this.openrouterApiKey = null;
+                await this.deleteFromStore('settings', 'openrouterApiKey');
             }
+
+            // If API keys changed, update all chats to use available provider
+            if (previousAnthropicKey !== this.anthropicApiKey || previousOpenrouterKey !== this.openrouterApiKey) {
+                const defaultProvider = this.getDefaultProvider();
+                const defaultModel = this.getDefaultModel(defaultProvider);
+
+                // Update active chats
+                for (const chatId in this.chats) {
+                    const chat = this.chats[chatId];
+                    if ((chat.provider === 'anthropic' && !this.anthropicApiKey) ||
+                        (chat.provider === 'openrouter' && !this.openrouterApiKey)) {
+                        chat.provider = defaultProvider;
+                        chat.agent = defaultModel;
+                        await this.putInStore('chats', chat);
+                    }
+                }
+
+                // Update archived chats
+                for (const chatId in this.archivedChats) {
+                    const chat = this.archivedChats[chatId];
+                    if ((chat.provider === 'anthropic' && !this.anthropicApiKey) ||
+                        (chat.provider === 'openrouter' && !this.openrouterApiKey)) {
+                        chat.provider = defaultProvider;
+                        chat.agent = defaultModel;
+                        await this.putInStore('archivedChats', chat);
+                    }
+                }
+
+                // Update current chat display if needed
+                if (this.currentChatId) {
+                    this.loadChat(this.currentChatId);
+                }
+            }
+
             this.elements.apiKeyModal.style.display = 'none';
         }
     }
@@ -220,6 +283,19 @@ class ChatApp {
         if (!chat) return;
 
         const newProvider = this.elements.providerSelect.value;
+        
+        // Validate provider selection based on available API keys
+        if (newProvider === 'anthropic' && !this.anthropicApiKey) {
+            alert('Anthropic API key is not set. Please set it in the global settings.');
+            this.elements.providerSelect.value = chat.provider;
+            return;
+        }
+        if (newProvider === 'openrouter' && !this.openrouterApiKey) {
+            alert('OpenRouter API key is not set. Please set it in the global settings.');
+            this.elements.providerSelect.value = chat.provider;
+            return;
+        }
+
         chat.provider = newProvider;
 
         // Set default model based on provider
@@ -240,13 +316,14 @@ class ChatApp {
 
     async createNewChat() {
         const chatId = Date.now().toString();
+        const provider = this.getDefaultProvider();
         const newChat = {
             id: chatId,
             title: 'New Chat',
             messages: [],
             systemPrompt: '',
-            agent: 'claude-3-5-sonnet-20241022',
-            provider: 'anthropic'
+            agent: this.getDefaultModel(provider),
+            provider: provider
         };
         
         this.chats[chatId] = newChat;
@@ -268,8 +345,27 @@ class ChatApp {
         const chat = this.chats[chatId] || this.archivedChats[chatId];
         if (!chat) return;
 
+        // If the chat's provider is not available (no API key), switch to available provider
+        if ((chat.provider === 'anthropic' && !this.anthropicApiKey) || 
+            (chat.provider === 'openrouter' && !this.openrouterApiKey)) {
+            chat.provider = this.getDefaultProvider();
+            chat.agent = this.getDefaultModel(chat.provider);
+            if (this.chats[chatId]) {
+                await this.putInStore('chats', chat);
+            } else {
+                await this.putInStore('archivedChats', chat);
+            }
+        }
+
         this.elements.systemPrompt.value = chat.systemPrompt || '';
-        this.elements.agentInput.value = chat.agent || 'claude-3-5-sonnet-20241022';
+        this.elements.agentInput.value = chat.agent;
+        this.elements.providerSelect.value = chat.provider;
+
+        // Disable provider options based on available API keys
+        const anthropicOption = Array.from(this.elements.providerSelect.options).find(opt => opt.value === 'anthropic');
+        const openrouterOption = Array.from(this.elements.providerSelect.options).find(opt => opt.value === 'openrouter');
+        if (anthropicOption) anthropicOption.disabled = !this.anthropicApiKey;
+        if (openrouterOption) openrouterOption.disabled = !this.openrouterApiKey;
 
         document.querySelectorAll('.chat-item').forEach(item => {
             item.classList.remove('active');
