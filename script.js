@@ -138,6 +138,19 @@ class ChatApp {
         return provider === 'openrouter' ? 'anthropic/claude-3.5-sonnet' : 'claude-3-5-sonnet-20241022';
     }
 
+    fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => {
+                // Remove data URL prefix (e.g., "data:image/png;base64,")
+                const base64 = reader.result.split(',')[1];
+                resolve(base64);
+            };
+            reader.onerror = error => reject(error);
+        });
+    }
+
     initializeElements() {
         this.elements = {
             hamburgerMenu: document.querySelector('.hamburger-menu'),
@@ -148,6 +161,8 @@ class ChatApp {
             agentInput: document.querySelector('.agent-input'),
             chatContainer: document.querySelector('.chat-container'),
             messageInput: document.querySelector('.message-input'),
+            fileUploadBtn: document.querySelector('.file-upload-btn'),
+            fileInput: document.querySelector('.file-input'),
             apiKeyModal: document.querySelector('.api-key-modal'),
             anthropicApiKey: document.querySelector('#anthropicApiKey'),
             openrouterApiKey: document.querySelector('#openrouterApiKey'),
@@ -167,6 +182,56 @@ class ChatApp {
     attachEventListeners() {
         // Add hamburger menu event listener
         this.elements.hamburgerMenu.addEventListener('click', () => this.toggleSidebar());
+
+        // File upload handling
+        this.elements.fileUploadBtn.addEventListener('click', () => {
+            this.elements.fileInput.click();
+        });
+
+        this.elements.fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            try {
+                const base64Data = await this.fileToBase64(file);
+                const fileType = file.type.startsWith('image/') ? 'image' : 'pdf';
+                
+                // Get any existing message text
+                const content = this.elements.messageInput.value.trim();
+                const fileInfo = `[Attached ${fileType}: ${file.name}]`;
+                const messageContent = content ? `${content}\n${fileInfo}` : fileInfo;
+
+                // Create and send message with attachment
+                if (this.currentChatId && this.chats[this.currentChatId]) {
+                    const chat = this.chats[this.currentChatId];
+                    chat.messages.push({
+                        role: 'user',
+                        content: messageContent,
+                        attachment: {
+                            name: file.name,
+                            type: fileType,
+                            data: base64Data,
+                            media_type: file.type,
+                        }
+                    });
+
+                    // Update chat title if it's the first message
+                    if (chat.messages.length === 1) {
+                        chat.title = messageContent.slice(0, 30) + (messageContent.length > 30 ? '...' : '');
+                        this.renderChatList();
+                    }
+
+                    // Save chat and clear inputs
+                    await this.putInStore('chats', chat);
+                    this.elements.messageInput.value = '';
+                    this.elements.fileInput.value = '';
+                    this.renderMessages();
+                }
+            } catch (error) {
+                console.error('Error processing file:', error);
+                alert('Error processing file. Please try again.');
+            }
+        });
         
         // Close sidebar when clicking outside on mobile
         document.addEventListener('click', (e) => {
@@ -613,6 +678,28 @@ class ChatApp {
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${msg.role}`;
 
+            // Handle file attachments first if present
+            if (msg.attachment) {
+                const attachmentDiv = document.createElement('div');
+                attachmentDiv.className = 'file-attachment';
+                
+                if (msg.attachment.type === 'image') {
+                    const img = document.createElement('img');
+                    img.src = `data:image/*;base64,${msg.attachment.data}`;
+                    img.alt = msg.attachment.name;
+                    attachmentDiv.appendChild(img);
+                } else if (msg.attachment.type === 'pdf') {
+                    const link = document.createElement('a');
+                    link.href = `data:application/pdf;base64,${msg.attachment.data}`;
+                    link.download = msg.attachment.name;
+                    link.textContent = `📄 Download ${msg.attachment.name}`;
+                    link.className = 'pdf-download-link';
+                    attachmentDiv.appendChild(link);
+                }
+                
+                messageDiv.appendChild(attachmentDiv);
+            }
+
             const contentDiv = document.createElement('div');
             contentDiv.className = 'message-content';
 
@@ -769,7 +856,23 @@ class ChatApp {
                         model: chat.agent || 'claude-3-5-sonnet-20241022',
                         max_tokens: 4096,
                         system: chat.systemPrompt || undefined,
-                        messages: chat.messages.slice(0, -1), // Exclude temporary message
+                        messages: chat.messages.slice(0, -1).map((msg) => {
+                            if (msg.attachment) {
+                                return {
+                                    role: msg.role,
+                                    content: [{
+                                        type: msg.attachment.type == 'pdf' ? 'document' : 'image',
+                                        source: {
+                                            type: "base64",
+                                            media_type: msg.attachment.media_type,
+                                            data: msg.attachment.data,
+                                        }
+                                    }]
+                                };
+                            } else {
+                                return msg;
+                            }
+                        }),
                         stream: true
                     })
                 });
@@ -789,7 +892,23 @@ class ChatApp {
                         model: chat.agent || 'anthropic/claude-3.5-sonnet',
                         messages: [
                             ...(chat.systemPrompt ? [{ role: 'system', content: chat.systemPrompt }] : []),
-                            ...chat.messages.slice(0, -1) // Exclude temporary message
+                            ...chat.messages.slice(0, -1).map((msg) => {
+                                if (msg.attachment) {
+                                    return {
+                                        role: msg.role,
+                                        content: [
+                                            {
+                                                type: 'image_url',
+                                                image_url: {
+                                                    url: `data:${msg.attachment.media_type};base64,${msg.attachment.data}`
+                                                }
+                                            }
+                                        ]
+                                    };
+                                } else {
+                                    return msg;
+                                }
+                            })
                         ],
                         stream: true
                     })

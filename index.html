@@ -27,7 +27,11 @@ The instructions to generate this file is in llm_instructions.txt
             <button class="settings-btn" title="Chat Settings">⚙️</button>
             <div class="chat-container"></div>
             <div class="input-container">
-                <textarea class="message-input" placeholder="Type your message here..."></textarea>
+                <div class="input-wrapper">
+                    <textarea class="message-input" placeholder="Type your message here..."></textarea>
+                    <button class="file-upload-btn" title="Upload Image/PDF">📎</button>
+                    <input type="file" class="file-input" accept="image/*,.pdf" style="display: none;">
+                </div>
             </div>
         </div>
 
