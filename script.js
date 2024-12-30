@@ -666,6 +666,25 @@ class ChatApp {
         }
     }
 
+    escapeHtml(text) {
+        // Split text into code blocks and non-code blocks
+        const parts = text.split(/(```[\s\S]*?```|`[^`]+`)/g);
+        
+        return parts.map((part, index) => {
+            // Even indices are non-code blocks that need escaping
+            // Odd indices are code blocks that should be preserved
+            if (index % 2 === 0) {
+                // Escape HTML entities and tags in non-code blocks
+                return part
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+            }
+            // Return code blocks unchanged
+            return part;
+        }).join('');
+    }
+
     renderMessages() {
         if (!this.currentChatId) return;
 
@@ -715,8 +734,10 @@ class ChatApp {
                 gfm: true
             });
 
+            // Escape XML/HTML tags in content before parsing markdown
+            const escapedContent = this.escapeHtml(msg.content);
             // Convert markdown to HTML
-            contentDiv.innerHTML = marked.parse(msg.content);
+            contentDiv.innerHTML = marked.parse(escapedContent);
 
             // Apply syntax highlighting to any code blocks
             contentDiv.querySelectorAll('pre code').forEach((block) => {
