@@ -854,7 +854,7 @@ class ChatApp {
                     },
                     body: JSON.stringify({
                         model: chat.agent || 'claude-3-5-sonnet-20241022',
-                        max_tokens: 4096,
+                        max_tokens: 8192,
                         system: chat.systemPrompt || undefined,
                         messages: chat.messages.slice(0, -1).map((msg) => {
                             if (msg.attachment) {
