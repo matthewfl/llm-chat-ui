@@ -53,4 +53,7 @@ can you make the ui responsive, so that it can be used on a phone.  The width of
 
 Can you make the global settings button not be visible when the sidebar is closed on smaller screenes
 
+Can you add the ability to add an image or pdf to the chat.  
+[[Required lots of additional prompting and manual editing of the code]]
+
 ```
