@@ -1,6 +1,40 @@
 # LLM Chat UI
 
-This is a static HTML webpage that can be used to chat with LLMs using the [Anthropic API](https://docs.anthropic.com/en/api/messages) or the [OpenRouter API](https://openrouter.ai/docs/requests) using CORS requets.  State is saved locally in the browser using IndexedDB.
+This is a static HTML webpage that can be used to chat with LLMs using the [Anthropic API](https://docs.anthropic.com/en/api/messages) or the [OpenRouter API](https://openrouter.ai/docs/requests) using CORS requests. State is saved locally in the browser using IndexedDB.
+
+## Features
+
+- **Multiple Chat Management**: Create, archive, delete, and reorder chats
+- **Dual API Support**: Use Anthropic API directly or OpenRouter for access to multiple models
+- **Web Search**: Enable Claude to search the web in real-time during conversations (Anthropic API only)
+- **Extended Thinking**: View Claude's internal reasoning process before final answers (Anthropic API only)
+- **File Uploads**: Support for images and PDFs
+- **Markdown Rendering**: Full markdown support with syntax highlighting
+- **Responsive Design**: Works on desktop and mobile devices
+- **Local Storage**: All data stored locally using IndexedDB
+- **Message Editing**: Edit and delete individual messages
+- **Custom System Prompts**: Set custom system prompts per chat
+- **Manual Message Addition**: Add messages directly without API calls
+
+## New Anthropic API Features
+
+### Web Search Tool
+Enable Claude to search the web during conversations:
+- Toggle web search on/off per chat
+- Configure maximum searches per request (1-20)
+- Automatic source citations in responses
+- Real-time information beyond Claude's knowledge cutoff
+
+### Extended Thinking
+View Claude's internal reasoning process:
+- Toggle extended thinking on/off per chat
+- Configure thinking token budget (1,000-32,000 tokens)
+- Collapsible thinking sections in the UI
+- Available on Claude 3.7+ and Claude 4 models
+
+**Note**: These features require specific Anthropic models:
+- Web Search: Available on Claude 3.5+, Claude 3.7+, and Claude 4 models
+- Extended Thinking: Available on Claude 3.7+ and Claude 4 models
 
 This code was 97% written by the `claude-3-5-sonnet-20241022` model from Anthropic, using the [cline](https://github.com/cline/cline) plugin for VSCode.
 

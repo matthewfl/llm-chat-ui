@@ -50,7 +50,33 @@ The instructions to generate this file are in README.md
                 </div>
                 <div class="settings-section">
                     <h3>Model</h3>
-                    <input type="text" class="agent-input" placeholder="Enter model name..." value="claude-3-5-sonnet-20241022">
+                    <input type="text" class="agent-input" placeholder="Enter model name..." value="claude-3-7-sonnet-20250219">
+                </div>
+                <div class="settings-section">
+                    <h3>Web Search</h3>
+                    <label class="toggle-container">
+                        <input type="checkbox" class="web-search-toggle">
+                        <span class="toggle-slider"></span>
+                        Enable web search
+                    </label>
+                    <div class="web-search-options" style="display: none;">
+                        <label>Max searches per request:
+                            <input type="number" class="max-searches" value="5" min="1" max="20">
+                        </label>
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <h3>Extended Thinking</h3>
+                    <label class="toggle-container">
+                        <input type="checkbox" class="thinking-toggle">
+                        <span class="toggle-slider"></span>
+                        Enable extended thinking
+                    </label>
+                    <div class="thinking-options" style="display: none;">
+                        <label>Thinking token budget:
+                            <input type="number" class="thinking-budget" value="10000" min="1000" max="32000" step="1000">
+                        </label>
+                    </div>
                 </div>
                 <div class="settings-section">
                     <h3>System Prompt</h3>

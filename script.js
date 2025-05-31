@@ -135,7 +135,7 @@ class ChatApp {
     }
 
     getDefaultModel(provider) {
-        return provider === 'openrouter' ? 'anthropic/claude-3.5-sonnet' : 'claude-3-5-sonnet-20241022';
+        return provider === 'openrouter' ? 'anthropic/claude-3.5-sonnet' : 'claude-3-7-sonnet-20250219';
     }
 
     fileToBase64(file) {
@@ -175,7 +175,13 @@ class ChatApp {
             settingsClose: document.querySelector('.settings-close'),
             messageRole: document.querySelector('.message-role'),
             messageContent: document.querySelector('.message-content'),
-            addMessageBtn: document.querySelector('.add-message-btn')
+            addMessageBtn: document.querySelector('.add-message-btn'),
+            webSearchToggle: document.querySelector('.web-search-toggle'),
+            webSearchOptions: document.querySelector('.web-search-options'),
+            maxSearches: document.querySelector('.max-searches'),
+            thinkingToggle: document.querySelector('.thinking-toggle'),
+            thinkingOptions: document.querySelector('.thinking-options'),
+            thinkingBudget: document.querySelector('.thinking-budget')
         };
     }
 
@@ -265,6 +271,14 @@ class ChatApp {
         this.elements.settingsClose.addEventListener('click', () => this.closeSettings());
         this.elements.addMessageBtn.addEventListener('click', () => this.addMessageDirectly());
         this.elements.providerSelect.addEventListener('change', () => this.updateProvider());
+        
+        // Web search toggle event listeners
+        this.elements.webSearchToggle.addEventListener('change', () => this.updateWebSearchSettings());
+        this.elements.maxSearches.addEventListener('input', () => this.updateWebSearchSettings());
+        
+        // Thinking toggle event listeners
+        this.elements.thinkingToggle.addEventListener('change', () => this.updateThinkingSettings());
+        this.elements.thinkingBudget.addEventListener('input', () => this.updateThinkingSettings());
     }
 
     openGlobalSettings() {
@@ -390,9 +404,57 @@ class ChatApp {
             chat.agent = 'anthropic/claude-3.5-sonnet';
             this.elements.agentInput.value = chat.agent;
         } else {
-            chat.agent = 'claude-3-5-sonnet-20241022';
+            chat.agent = 'claude-3-7-sonnet-20250219';
             this.elements.agentInput.value = chat.agent;
         }
+        
+        if (this.chats[this.currentChatId]) {
+            await this.putInStore('chats', chat);
+        } else {
+            await this.putInStore('archivedChats', chat);
+        }
+    }
+
+    async updateWebSearchSettings() {
+        if (!this.currentChatId) return;
+
+        const chat = this.chats[this.currentChatId] || this.archivedChats[this.currentChatId];
+        if (!chat) return;
+
+        const webSearchEnabled = this.elements.webSearchToggle.checked;
+        const maxSearches = parseInt(this.elements.maxSearches.value) || 5;
+
+        chat.webSearch = {
+            enabled: webSearchEnabled,
+            maxSearches: maxSearches
+        };
+
+        // Show/hide options based on toggle
+        this.elements.webSearchOptions.style.display = webSearchEnabled ? 'block' : 'none';
+        
+        if (this.chats[this.currentChatId]) {
+            await this.putInStore('chats', chat);
+        } else {
+            await this.putInStore('archivedChats', chat);
+        }
+    }
+
+    async updateThinkingSettings() {
+        if (!this.currentChatId) return;
+
+        const chat = this.chats[this.currentChatId] || this.archivedChats[this.currentChatId];
+        if (!chat) return;
+
+        const thinkingEnabled = this.elements.thinkingToggle.checked;
+        const thinkingBudget = parseInt(this.elements.thinkingBudget.value) || 10000;
+
+        chat.thinking = {
+            enabled: thinkingEnabled,
+            budget: thinkingBudget
+        };
+
+        // Show/hide options based on toggle
+        this.elements.thinkingOptions.style.display = thinkingEnabled ? 'block' : 'none';
         
         if (this.chats[this.currentChatId]) {
             await this.putInStore('chats', chat);
@@ -410,7 +472,15 @@ class ChatApp {
             messages: [],
             systemPrompt: '',
             agent: this.getDefaultModel(provider),
-            provider: provider
+            provider: provider,
+            webSearch: {
+                enabled: false,
+                maxSearches: 5
+            },
+            thinking: {
+                enabled: false,
+                budget: 10000
+            }
         };
         
         this.chats[chatId] = newChat;
@@ -447,6 +517,22 @@ class ChatApp {
         this.elements.systemPrompt.value = chat.systemPrompt || '';
         this.elements.agentInput.value = chat.agent;
         this.elements.providerSelect.value = chat.provider;
+
+        // Load web search settings
+        if (!chat.webSearch) {
+            chat.webSearch = { enabled: false, maxSearches: 5 };
+        }
+        this.elements.webSearchToggle.checked = chat.webSearch.enabled;
+        this.elements.maxSearches.value = chat.webSearch.maxSearches;
+        this.elements.webSearchOptions.style.display = chat.webSearch.enabled ? 'block' : 'none';
+
+        // Load thinking settings
+        if (!chat.thinking) {
+            chat.thinking = { enabled: false, budget: 10000 };
+        }
+        this.elements.thinkingToggle.checked = chat.thinking.enabled;
+        this.elements.thinkingBudget.value = chat.thinking.budget;
+        this.elements.thinkingOptions.style.display = chat.thinking.enabled ? 'block' : 'none';
 
         // Disable provider options based on available API keys
         const anthropicOption = Array.from(this.elements.providerSelect.options).find(opt => opt.value === 'anthropic');
@@ -719,6 +805,67 @@ class ChatApp {
                 messageDiv.appendChild(attachmentDiv);
             }
 
+            // Handle thinking content if present
+            if (msg.thinking && msg.role === 'assistant') {
+                const thinkingDiv = document.createElement('div');
+                thinkingDiv.className = 'thinking-content';
+                
+                const thinkingHeader = document.createElement('div');
+                thinkingHeader.className = 'thinking-header';
+                thinkingHeader.innerHTML = `
+                    <span>🤔 Claude's Thinking</span>
+                    <span class="thinking-toggle">Click to expand</span>
+                `;
+                
+                const thinkingBody = document.createElement('div');
+                thinkingBody.className = 'thinking-body';
+                thinkingBody.textContent = msg.thinking;
+                thinkingBody.style.display = 'none';
+                
+                thinkingHeader.addEventListener('click', () => {
+                    const isVisible = thinkingBody.style.display !== 'none';
+                    thinkingBody.style.display = isVisible ? 'none' : 'block';
+                    thinkingHeader.querySelector('.thinking-toggle').textContent = 
+                        isVisible ? 'Click to expand' : 'Click to collapse';
+                });
+                
+                thinkingDiv.appendChild(thinkingHeader);
+                thinkingDiv.appendChild(thinkingBody);
+                messageDiv.appendChild(thinkingDiv);
+            }
+
+            // Handle search citations if present
+            if (msg.citations && msg.citations.length > 0 && msg.role === 'assistant') {
+                const citationsDiv = document.createElement('div');
+                citationsDiv.className = 'search-citations';
+                
+                const citationsHeader = document.createElement('h4');
+                citationsHeader.textContent = '🔍 Sources';
+                citationsDiv.appendChild(citationsHeader);
+                
+                msg.citations.forEach(citation => {
+                    const citationDiv = document.createElement('div');
+                    citationDiv.className = 'citation';
+                    
+                    const citationTitle = document.createElement('a');
+                    citationTitle.className = 'citation-title';
+                    citationTitle.href = citation.url;
+                    citationTitle.target = '_blank';
+                    citationTitle.rel = 'noopener noreferrer';
+                    citationTitle.textContent = citation.title;
+                    
+                    const citationUrl = document.createElement('div');
+                    citationUrl.className = 'citation-url';
+                    citationUrl.textContent = citation.url;
+                    
+                    citationDiv.appendChild(citationTitle);
+                    citationDiv.appendChild(citationUrl);
+                    citationsDiv.appendChild(citationDiv);
+                });
+                
+                messageDiv.appendChild(citationsDiv);
+            }
+
             const contentDiv = document.createElement('div');
             contentDiv.className = 'message-content';
 
@@ -871,6 +1018,7 @@ class ChatApp {
                         'Content-Type': 'application/json',
                         'x-api-key': this.anthropicApiKey,
                         'anthropic-version': '2023-06-01',
+                        'anthropic-beta': 'interleaved-thinking-2025-05-14',
                         'anthropic-dangerous-direct-browser-access': 'true',
                     },
                     body: JSON.stringify({
@@ -891,9 +1039,25 @@ class ChatApp {
                                     }]
                                 };
                             } else {
-                                return msg;
+                                return {
+                                    role: msg.role,
+                                    content: msg.content
+                                };
                             }
                         }),
+                        ...(chat.webSearch?.enabled ? {
+                            tools: [{
+                                type: "web_search_20250305",
+                                name: "web_search",
+                                max_uses: chat.webSearch.maxSearches || 5
+                            }]
+                        } : {}),
+                        ...(chat.thinking?.enabled ? {
+                            thinking: {
+                                type: "enabled",
+                                budget_tokens: chat.thinking.budget || 10000
+                            }
+                        } : {}),
                         stream: true
                     })
                 });
@@ -972,9 +1136,18 @@ class ChatApp {
                                     case 'content_block_delta':
                                         // Append content from the delta
                                         if (data.delta?.text) {
+                                            // Handle regular text content
                                             tempMessage.content += data.delta.text;
                                             this.renderMessages();
                                             // Scroll to bottom as content streams in
+                                            this.elements.chatContainer.scrollTop = this.elements.chatContainer.scrollHeight;
+                                        } else if (data.delta?.thinking) {
+                                            // Handle thinking content
+                                            if (!tempMessage.thinking) {
+                                                tempMessage.thinking = '';
+                                            }
+                                            tempMessage.thinking += data.delta.thinking;
+                                            this.renderMessages();
                                             this.elements.chatContainer.scrollTop = this.elements.chatContainer.scrollHeight;
                                         }
                                         break;
